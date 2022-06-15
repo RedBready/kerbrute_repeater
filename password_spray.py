@@ -6,7 +6,6 @@ import time
 # I made this script to avoid having to make password spraying more efficient and safer.
 parser = argparse.ArgumentParser(description="Password sprayer using Kerbrute.",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-#parser.add_argument("-a", "--archive", action="store_true", help="archive mode")
 parser.add_argument("--users", help="Path to username list.")
 parser.add_argument("--passwords", help="Path to password list.")
 parser.add_argument("--sleep", type=int, default=120, help="Minutes to sleep in between password sprays.")
