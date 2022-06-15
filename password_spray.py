@@ -4,6 +4,7 @@ import time
 
 # This script assumes you have kerbrute in /usr/local/bin/. It used kerbrute to spray a list of passwords, and wait a given amount of time in between each run.
 # I made this script to avoid having to make password spraying more efficient and safer.
+
 parser = argparse.ArgumentParser(description="Password sprayer using Kerbrute.",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--users", help="Path to username list.")
