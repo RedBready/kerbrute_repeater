@@ -7,8 +7,8 @@ import time
 
 parser = argparse.ArgumentParser(description="Password sprayer using Kerbrute.",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--users", help="Path to username list.")
-parser.add_argument("--passwords", help="Path to password list.")
+parser.add_argument("--users", required=True, help="Path to username list.")
+parser.add_argument("--passwords", required=True, help="Path to password list.")
 parser.add_argument("--sleep", type=int, default=120, help="Minutes to sleep in between password sprays.")
 parser.add_argument("--domain", help="Domain name.")
 parser.add_argument("--attempts", default=1, type=int, help="Number of attempts before sleeping.")
