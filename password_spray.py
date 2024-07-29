@@ -1,6 +1,7 @@
 import subprocess
 import argparse
 import time
+import sys
 
 # This script assumes you have kerbrute in /usr/local/bin/. It used kerbrute to spray a list of passwords, and wait a given amount of time in between each run.
 # I made this script to make password spraying more efficient and safer.
