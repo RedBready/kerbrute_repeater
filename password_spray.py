@@ -1,7 +1,9 @@
-import subprocess
 import argparse
-import time
+import os
+import shutil
+import subprocess
 import sys
+import time
 
 # This script assumes you have kerbrute in /usr/local/bin/. It used kerbrute to spray a list of passwords, and wait a given amount of time in between each run.
 # I made this script to make password spraying more efficient and safer.
@@ -16,6 +18,12 @@ parser.add_argument("--attempts", default=1, type=int, help="Number of attempts 
 
 args = parser.parse_args()
 
+kerbrute_path = shutil.which("kerbrute")
+if not kerbrute_path or not os.access(kerbrute_path, os.X_OK):
+    print("Kerbrute is not installed or executable. Install it from https://github.com/ropnop/kerbrute "
+          "or update this script to call the program from a custom path.")
+    sys.exit(1)
+
 p = args.passwords
 s = args.sleep
 u = args.users
@@ -26,7 +34,7 @@ i = 0
 
 with open (p) as passwords:
      while (password := passwords.readline().rstrip()):
-        subprocess.run(["kerbrute", "passwordspray" , "-d", d, u , password], check=True)
+        subprocess.run([kerbrute_path, "passwordspray" , "-d", d, u , password], check=True)
         i += 1
         if i == a:
             i = 0
