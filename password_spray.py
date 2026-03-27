@@ -117,14 +117,14 @@ with open (p) as passwords:
         try:
             if ip != "":
                 process = subprocess.Popen(
-                    [kerbrute_path, "passwordspray", "--verbose", "--safe", "-d", d, "--dc", ip, u, password],
+                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, "--dc", ip, u, password],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True
                 )
             else:
                 process = subprocess.Popen(
-                    [kerbrute_path, "passwordspray", "--verbose", "--safe", "-d", d, u, password],
+                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, u, password],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True
