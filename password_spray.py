@@ -192,12 +192,12 @@ with open (p) as passwords:
             finally:
                 if tu and os.path.exists(tu.name):
                     os.remove(tu.name)
-                k = 0
-                au = u
-                tu = None
-                
-                with open(au) as f:
-                    total_users = sum(1 for _ in f)
+                    k = 0
+                    au = u
+                    tu = None
+                    
+                    with open(au) as f:
+                        total_users = sum(1 for _ in f)
 
             with open(lf, "a") as log:
                 log.write(f"--- Password: {password} ---\n")
