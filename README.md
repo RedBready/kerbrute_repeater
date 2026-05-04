@@ -29,3 +29,9 @@ kerbrute passwordspray -d <domain> <users_file> <password>
   - How many attempts to make before the script takes a break (--attempts)
 
   - How long that break should be (--sleep in minutes)
+
+- Additionally, your session is saved and log of successful login is also saved
+  
+- You can resume of specific line of the password file
+  
+- You can add password to the password file and will preserve the order
