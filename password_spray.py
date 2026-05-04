@@ -203,7 +203,7 @@ while j < len(passwords):
     except subprocess.CalledProcessError as e:
         print(e)
         
-    print(f"[Processed: {j}/{len(passwords)}] Sprayed password: {passwords[j]}")
+    print(f"[{j}/{len(passwords)}] Sprayed password: {passwords[j]}")
     sys.stdout.flush()
     
     i += 1
@@ -227,7 +227,7 @@ while j < len(passwords):
     if i == a:
         i = 0
         print(f"Sleeping for {s} minute(s) after {a} attempt(s)...")
-        print(f"Resume with --pwd-line {j} if interrupted")
+        #print(f"Resume with --pwd-line {j} if interrupted")
         sys.stdout.flush()
         
         remaining_time = seconds
